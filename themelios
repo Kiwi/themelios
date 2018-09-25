@@ -158,11 +158,11 @@ uefi_or_legacy() {
     if [[ $use_uefi_sdX = "true" ]]
     then
         efi_part="2"
-        ext2_part="3"
+        ext4_part="3"
         zpool_partition="4"
     else
         efi_part="-part2"
-        ext2_part="-part3"
+        ext4_part="-part3"
         zpool_partition="-part4"
     fi
 }
