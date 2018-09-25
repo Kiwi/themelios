@@ -150,6 +150,21 @@ uefi_or_legacy() {
     # let's do:
     # and enable grub incompatible pool features as bonus side affect.
     [[ -d "/sys/firmware/efi/efivars" ]] && uefi_install="1"
+
+    # for uefi users append 3 or -part3 to the zpool create command depending on if using id or sd*.
+    # do likewise for ext2 and fat32 partitions.
+    [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="true"
+
+    if [[ $use_uefi_sdX = "true" ]]
+    then
+        efi_part="2"
+        ext2_part="3"
+        zpool_partition="4"
+    else
+        efi_part="-part2"
+        ext2_part="-part3"
+        zpool_partition="-part4"
+    fi
 }
 
 switch_if_needed() {
@@ -276,7 +291,6 @@ disk_prep() {
         wait
     }
     [[ $use_zero_disks == "true" ]] && dd_zero
-
 }
 
 zpool_create() {
@@ -299,7 +313,7 @@ zpool_create() {
           -R /mnt \
           $zfs_pool_name \
           $zfs_pool_type \
-          $zfs_pool_disks_joined${zpool_partition} || fail_warning
+          $zfs_pool_disks_joined$zpool_partition || fail_warning
 
     # https://github.com/NixOS/nixpkgs/issues/16954
     zfs set acltype=posixacl "$zfs_pool_name"
@@ -317,29 +331,14 @@ uefi_create() {
         sgdisk -n 4:4116476:$ENDSECTOR -c 4:"Linux ZPOOL Partition" -t 3:8300 "$disk_id"
         sgdisk -p "$disk_id"
     done
+}
 
-    uefi_mkfs() {
-        # for uefi users append 3 or -part3 to the zpool create command depending on if using id or sd*.
-        # do likewise for ext2 and fat32 partitions.
-        [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="true"
-
-        if [[ $use_uefi_sdX = "true" ]]
-        then
-            efi_part="2"
-            ext2_part="3"
-            zpool_partition="4"
-        else
-            efi_part="-part2"
-            ext2_part="-part3"
-            zpool_partition="-part4"
-        fi
-        # make ext2 for boot and fat32 for /boot/efi
-        for disk_id in "${zfs_pool_disks[@]}"
-        do
-            mkfs.vfat -F32 "$disk_id""$efi_part"
-            mkfs.ext2 "$disk_id""$ext2_part"
-        done
-    }
+uefi_mkfs() {
+    # make fat32 for /efi on all disks
+    for disk_id in "${zfs_pool_disks[@]}"
+    do
+        mkfs.vfat -F32 "$disk_id""$efi_part"
+    done
 
     uefi_sda_or_id
     uefi_mkfs
@@ -352,10 +351,10 @@ uefi_create() {
     #if disks are more than one,
     #get total number of items in array for --raid-devices
     #get letter for each item, separate with commas
-    mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=4 /dev/sd[a,b,c,d]$ext2_part
+    mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=$dev_num /dev/sd[$dev_letter]$ext4_part
     mkfs.ext4 -m 0 -L boot -j /dev/md127
     mount /dev/md127 /mnt/boot
-    # else do not mdadm and mount ${zfs_pool_disks[1]}""$ext2_part
+    # else do not mdadm and mkfs.ext4 "${zfs_pool_disks[1]}""$ext4_part" && mount "${zfs_pool_disks[1]}""$ext4_part"
 
     # mount uefi partition on the first disk (uefi cannot be raided.)
     mount "${zfs_pool_disks[1]}""$efi_part" /mnt/efi
