@@ -254,7 +254,6 @@ get_custom_nixcfg() {
 }
 
 disk_prep() {
-
     sgdisk_clear() {
         for disk_id in "${zfs_pool_disks[@]}"
         do
@@ -305,10 +304,47 @@ zpool_create() {
           -R /mnt \
           $zfs_pool_name \
           $zfs_pool_type \
-          $zfs_pool_disks_joined || fail_warning
+          $zfs_pool_disks_joined${zpool_partition} || fail_warning
 
     # https://github.com/NixOS/nixpkgs/issues/16954
     zfs set acltype=posixacl "$zfs_pool_name"
+}
+
+uefi_create() {
+    # make 1mb bios boot, 200mb efi, remaining partition 3 for the zpool
+    for disk_id in "${zfs_pool_disks[@]}"
+    do
+        sgdisk -og "$disk_id"
+        sgdisk -n 1:2048:4095 -c 1:"BIOS Boot Partition" -t 1:ef02 "$disk_id"
+        sgdisk -n 2:4096:413695 -c 2:"EFI System Partition" -t 2:ef00 "$disk_id"
+        ENDSECTOR=`sgdisk -E "$disk_id"`
+        sgdisk -n 3:413696:$ENDSECTOR -c 3:"Linux" -t 3:8300 "$disk_id"
+        sgdisk -p "$disk_id"
+    done
+
+    # for uefi users append 3 or -part3 to the zpool create command depending on if using id or sd*.
+    # similarly do likewise for the second efi partition for use in the mkfs command.
+    uefi_sda_or_id() {
+        [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="true"
+
+        if [[ $use_uefi_sdX = "true" ]]
+        then
+            efi_part="2"
+            zpool_partition="3"
+        else
+            efi_part="-part2"
+            zpool_partition="-part3"
+        fi
+    }
+    uefi_make_vfat() {
+        # make fat filesystems on efi partitions
+        for disk_id in "${zfs_pool_disks[@]}"
+        do
+            mkfs.vfat -F32 "$disk_id""$efi_part"
+        done
+    }
+
+    zpool_create
 }
 
 create_bios_boot_partitions() {
