@@ -148,13 +148,8 @@ fail_warning() {
 uefi_or_legacy() {
     # todo add uefi support.
     # let's do:
-    # /boot/grub as efi partition with fat32
-    # /boot with ext2
-    # $zfs_dataset_slashnix_no_root == "true" #default for uefi
-    # and set the boot.loader.grub.copy_kernels = false; #default for uefi
     # and enable grub incompatible pool features as bonus side affect.
-    # and use less aggressive garbage collection in the UEFI recommended extra settings.
-    [[ -d "/sys/firmware/efi/efivars" ]] && die "only legacy bios is supported for now."
+    [[ -d "/sys/firmware/efi/efivars" ]] && uefi_install="1"
 }
 
 switch_if_needed() {
@@ -311,40 +306,59 @@ zpool_create() {
 }
 
 uefi_create() {
-    # make 1mb bios boot, 200mb efi, remaining partition 3 for the zpool
+    # make 1mb bios boot, 200mb efi, 1GB ext2 and remaining partition 4 for the zpool
     for disk_id in "${zfs_pool_disks[@]}"
     do
         sgdisk -og "$disk_id"
         sgdisk -n 1:2048:4095 -c 1:"BIOS Boot Partition" -t 1:ef02 "$disk_id"
         sgdisk -n 2:4096:413695 -c 2:"EFI System Partition" -t 2:ef00 "$disk_id"
+        sgdisk -n 3:413696:4116475 -c 3:"Linux /boot" -t 3:8300 "$disk_id"
         ENDSECTOR=`sgdisk -E "$disk_id"`
-        sgdisk -n 3:413696:$ENDSECTOR -c 3:"Linux" -t 3:8300 "$disk_id"
+        sgdisk -n 4:4116476:$ENDSECTOR -c 4:"Linux ZPOOL Partition" -t 3:8300 "$disk_id"
         sgdisk -p "$disk_id"
     done
 
-    # for uefi users append 3 or -part3 to the zpool create command depending on if using id or sd*.
-    # similarly do likewise for the second efi partition for use in the mkfs command.
-    uefi_sda_or_id() {
+    uefi_mkfs() {
+        # for uefi users append 3 or -part3 to the zpool create command depending on if using id or sd*.
+        # do likewise for ext2 and fat32 partitions.
         [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="true"
 
         if [[ $use_uefi_sdX = "true" ]]
         then
             efi_part="2"
-            zpool_partition="3"
+            ext2_part="3"
+            zpool_partition="4"
         else
             efi_part="-part2"
-            zpool_partition="-part3"
+            ext2_part="-part3"
+            zpool_partition="-part4"
         fi
-    }
-    uefi_make_vfat() {
-        # make fat filesystems on efi partitions
+        # make ext2 for boot and fat32 for /boot/efi
         for disk_id in "${zfs_pool_disks[@]}"
         do
             mkfs.vfat -F32 "$disk_id""$efi_part"
+            mkfs.ext2 "$disk_id""$ext2_part"
         done
     }
 
-    zpool_create
+    uefi_sda_or_id
+    uefi_mkfs
+
+    mkdir /mnt/boot/
+    mkdir /mnt/efi
+
+    # Create a raid of the first partitions for /boot (GRUB)
+    #TODO
+    #if disks are more than one,
+    #get total number of items in array for --raid-devices
+    #get letter for each item, separate with commas
+    mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=4 /dev/sd[a,b,c,d]$ext2_part
+    mkfs.ext4 -m 0 -L boot -j /dev/md127
+    mount /dev/md127 /mnt/boot
+    # else do not mdadm and mount ${zfs_pool_disks[1]}""$ext2_part
+
+    # mount uefi partition on the first disk (uefi cannot be raided.)
+    mount "${zfs_pool_disks[1]}""$efi_part" /mnt/efi
 }
 
 create_bios_boot_partitions() {
@@ -620,6 +634,8 @@ get_custom_nixcfg
 
 # use sgdisk wipefs and dd tools to cleanup old disks.
 disk_prep
+
+[[ $uefi_install ]] && uefi_create
 
 # create default zpool or maybe-use optional user overlay instead.
 if [[ -f $zfs_pool_overlay_file ]]
