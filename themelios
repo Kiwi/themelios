@@ -492,12 +492,20 @@ $maybe_append_host_id
 }
 EOF
 
+    if [[ $uefi_install ]]
+    then
+        nix_zfs_configuration_enabled="true"
+        maybe_grub_efiSupport="boot.loader.grub.efiSupport = true;"
+    else
+        maybe_grub_zfsSupport="boot.supportedFilesystems = [ \"zfs\" ];"
+    fi
     [[ $nix_zfs_configuration_enabled == "true" ]] && cat << EOF > /mnt/etc/nixos/zfs-configuration.nix
 { ... }:
 { imports = [];
 
-# Configure grub with zfs support.
-boot.supportedFilesystems = [ "zfs" ];
+# Configure grub with efi or zfs support if needed
+$maybe_grub_efiSupport
+$maybe_grub_zfsSupport
 boot.loader.grub.enable = true;
 boot.loader.grub.version = 2;
 boot.loader.grub.devices = [
@@ -623,6 +631,7 @@ EOF
 # rerun script with "STARTOVER=1 POOL=zroot themelios foo bar" to attempt a fresh start.
 [[ ${STARTOVER} ]] && start_over
 
+# arguments
 [[ $1 == "-h" ]] && help
 [[ $1 == "--help" ]] && help
 [[ $# -lt 2 ]] && usage
