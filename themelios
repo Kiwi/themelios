@@ -340,16 +340,29 @@ uefi_mkfs() {
         mkfs.vfat -F32 "$disk_id""$efi_part"
     done
 
+    id_translate() {
+        for disk_id in "${zfs_pool_disks[@]}"; do
+            tchars=$(readlink $disk_id)
+            translated_chars+=("$tchars")
+        done
+    }
+    [[ ! $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && id_translate
+
+    if [[ $translated_chars ]]
+    then
+        dev_chars=$(join_by ',' "${translated_chars[@]#../../dev/sd##*/sd}}")
+    else
+        # get disk letter for each disk for the mdadm command.
+        dev_chars=$(join_by ',' "${zfs_pool_disks[@]#/dev/sd}")
+    fi
+
     uefi_sda_or_id
     uefi_mkfs
-
     mkdir /mnt/boot/
     mkdir /mnt/efi
 
     if [[  ${#zfs_pool_disks[@]} -gt 1 ]]
     then
-        # get disk letter for each disk for the mdadm command.
-        dev_chars=$(join_by ',' "${zfs_pool_disks[@]#/dev/sd}")
         mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=${#zfs_pool_disks[@]} /dev/sd["$dev_chars"]$ext4_part
         mkfs.ext4 -m 0 -L boot -j /dev/md127
         mount /dev/md127 /mnt/boot
