@@ -7,6 +7,10 @@ datasets_create() {
     mount -t zfs "$zfs_pool_name"/ROOT/nixos /mnt
     zpool set bootfs="$zfs_pool_name"/ROOT/nixos "$zfs_pool_name"
 
+    # for UEFI systems - create and mount /boot as ext4 (and uses mdadm if multi-disks)
+    # this also mounts the EFI partition to /efi with a fat32 fs.
+    [[ $uefi_install ]] && uefi_mkfs
+
     slash_nix_outside_root() {
         zfs create -o mountpoint=none -o canmount=off -o sync=always "$zfs_pool_name"/NIX
         zfs create -o mountpoint=legacy -o canmount=on "$zfs_pool_name"/NIX/nix

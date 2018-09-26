@@ -146,16 +146,12 @@ fail_warning() {
 }
 
 uefi_or_legacy() {
-    # todo add uefi support.
-    # let's do:
-    # and enable grub incompatible pool features as bonus side affect.
+    # detect if this is a uefi installation.
     [[ -d "/sys/firmware/efi/efivars" ]] && uefi_install="1"
 
-    # for uefi users append 3 or -part3 to the zpool create command depending on if using id or sd*.
-    # do likewise for ext2 and fat32 partitions.
-    [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="true"
-
-    if [[ $use_uefi_sdX = "true" ]]
+    # some initial translation for whether or not the script was provided disks with sd* or /dev/disk/by-id/*
+    [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="1"
+    if [[ $use_uefi_sdX ]]
     then
         efi_part="2"
         ext4_part="3"
@@ -319,8 +315,8 @@ zpool_create() {
     zfs set acltype=posixacl "$zfs_pool_name"
 }
 
-uefi_create() {
-    # make 1mb bios boot, 200mb efi, 1GB ext4 and remaining partition 4 for the zpool
+uefi_disk_part() {
+    # make 1mb bios boot, 200mb efi, 1GB ext4 and remaining partition for the zpool
     for disk_id in "${zfs_pool_disks[@]}"
     do
         sgdisk -og "$disk_id"
@@ -337,7 +333,8 @@ uefi_mkfs() {
     # make fat32 for /efi on all disks
     for disk_id in "${zfs_pool_disks[@]}"
     do
-        mkfs.vfat -F32 "$disk_id""$efi_part"
+        # https://wiki.archlinux.org/index.php/EFI_system_partition#Format_the_partition
+        mkfs.vfat -F32 "$disk_id""$efi_part" || mkfs.fat -s2 -F32 "$disk_id""$efi_part"
     done
 
     # translate /dev/disk/by-id to /dev/sd* for mdadm if necessary
@@ -360,9 +357,10 @@ uefi_mkfs() {
     # make mountpoints
     mkdir -p /mnt/{efi,boot}
 
-    # mount ext4 mdadm or single disk partition
+    # mount /mnt/boot
     if [[  ${#zfs_pool_disks[@]} -gt 1 ]]
     then
+        # mount ext4 mdadm if more than one disk
         mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=${#zfs_pool_disks[@]} /dev/sd["$dev_chars"]$ext4_part
         mkfs.ext4 -m 0 -L boot -j /dev/md127
         mount /dev/md127 /mnt/boot
@@ -372,7 +370,7 @@ uefi_mkfs() {
         mount "${zfs_pool_disks[1]}""$ext4_part" /mnt/boot
     fi
 
-    # mount uefi partition on the first disk (uefi cannot be raided.)
+    # mount uefi partition only on the first disk (efi partitions cannot be raided.)
     mount "${zfs_pool_disks[1]}""$efi_part" /mnt/efi
 }
 
@@ -393,7 +391,8 @@ datasets_create() {
     mount -t zfs "$zfs_pool_name"/ROOT/nixos /mnt
     zpool set bootfs="$zfs_pool_name"/ROOT/nixos "$zfs_pool_name"
 
-    # create and mount /boot and /efi for UEFI systems.
+    # for UEFI systems - create and mount /boot as ext4 (and uses mdadm if multi-disks)
+    # this also mounts the EFI partition to /efi with a fat32 fs.
     [[ $uefi_install ]] && uefi_mkfs
 
     slash_nix_outside_root() {
@@ -653,7 +652,8 @@ get_custom_nixcfg
 # use sgdisk wipefs and dd tools to cleanup old disks.
 disk_prep
 
-[[ $uefi_install ]] && uefi_create
+# if uefi partition disks for a uefi disk scheme
+[[ $uefi_install ]] && uefi_disk_part
 
 # create default zpool or maybe-use optional user overlay instead.
 if [[ -f $zfs_pool_overlay_file ]]
@@ -662,8 +662,6 @@ then
 else
     zpool_create
 fi
-
-[[ $uefi_install ]] && uefi_mkfs
 
 [[ ! $uefi_install ]] && create_bios_boot_partitions
 
