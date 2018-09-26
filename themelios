@@ -346,16 +346,18 @@ uefi_mkfs() {
     mkdir /mnt/boot/
     mkdir /mnt/efi
 
-    # Create a raid of the first partitions for /boot (GRUB)
-    #TODO
-    #if disks are more than one,
-    #get total number of items in array for --raid-devices
-    #get letter for each item, separate with commas
-    mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=$dev_num /dev/sd[$dev_letter]$ext4_part
-    mkfs.ext4 -m 0 -L boot -j /dev/md127
-    mount /dev/md127 /mnt/boot
-    # else do not mdadm and mkfs.ext4 "${zfs_pool_disks[1]}""$ext4_part" && mount "${zfs_pool_disks[1]}""$ext4_part"
-
+    if [[  ${#zfs_pool_disks[@]} -gt 1 ]]
+    then
+        # get disk letter for each disk for the mdadm command.
+        dev_chars=$(join_by ',' "${zfs_pool_disks[@]#/dev/sd}")
+        mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=${#zfs_pool_disks[@]} /dev/sd["$dev_chars"]$ext4_part
+        mkfs.ext4 -m 0 -L boot -j /dev/md127
+        mount /dev/md127 /mnt/boot
+    else
+        # it's a single disk don't use mdadm
+        mkfs.ext4 "${zfs_pool_disks[1]}""$ext4_part"
+        mount "${zfs_pool_disks[1]}""$ext4_part"
+    fi
     # mount uefi partition on the first disk (uefi cannot be raided.)
     mount "${zfs_pool_disks[1]}""$efi_part" /mnt/efi
 }
