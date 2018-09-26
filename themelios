@@ -494,7 +494,6 @@ EOF
 
     if [[ $uefi_install ]]
     then
-        nix_zfs_configuration_enabled="true"
         maybe_grub_efiSupport="boot.loader.grub.efiSupport = true;"
     else
         maybe_grub_zfsSupport="boot.supportedFilesystems = [ \"zfs\" ];"
