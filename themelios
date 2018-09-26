@@ -320,7 +320,7 @@ zpool_create() {
 }
 
 uefi_create() {
-    # make 1mb bios boot, 200mb efi, 1GB ext2 and remaining partition 4 for the zpool
+    # make 1mb bios boot, 200mb efi, 1GB ext4 and remaining partition 4 for the zpool
     for disk_id in "${zfs_pool_disks[@]}"
     do
         sgdisk -og "$disk_id"
@@ -357,19 +357,19 @@ uefi_mkfs() {
         dev_chars=$(join_by ',' "${zfs_pool_disks[@]#/dev/sd}")
     fi
 
-    uefi_mkfs
-    mkdir /mnt/boot/
-    mkdir /mnt/efi
+    # make mountpoints
+    mkdir -p /mnt/{efi,boot}
 
+    # mount ext4 mdadm or single disk partition
     if [[  ${#zfs_pool_disks[@]} -gt 1 ]]
     then
         mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=${#zfs_pool_disks[@]} /dev/sd["$dev_chars"]$ext4_part
         mkfs.ext4 -m 0 -L boot -j /dev/md127
         mount /dev/md127 /mnt/boot
     else
-        # it's a single disk don't use mdadm
+        # if it's a single disk don't use mdadm
         mkfs.ext4 "${zfs_pool_disks[1]}""$ext4_part"
-        mount "${zfs_pool_disks[1]}""$ext4_part"
+        mount "${zfs_pool_disks[1]}""$ext4_part" /mnt/boot
     fi
 
     # mount uefi partition on the first disk (uefi cannot be raided.)
@@ -392,6 +392,9 @@ datasets_create() {
     zfs create -o mountpoint=legacy -o canmount=on "$zfs_pool_name"/ROOT/nixos
     mount -t zfs "$zfs_pool_name"/ROOT/nixos /mnt
     zpool set bootfs="$zfs_pool_name"/ROOT/nixos "$zfs_pool_name"
+
+    # create and mount /boot and /efi for UEFI systems.
+    [[ $uefi_install ]] && uefi_mkfs
 
     slash_nix_outside_root() {
         zfs create -o mountpoint=none -o canmount=off -o sync=always "$zfs_pool_name"/NIX
