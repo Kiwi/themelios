@@ -297,6 +297,7 @@ zpool_create() {
     join_by() { local IFS="$1"; shift; echo "$*"; }
     zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks[@]}")
 
+    #TODO add zpool partition number
     echo "creating zpool..."
     zpool create -f \
           -o ashift=12 \
@@ -309,7 +310,7 @@ zpool_create() {
           -R /mnt \
           $zfs_pool_name \
           $zfs_pool_type \
-          $zfs_pool_disks_joined$zpool_partition || fail_warning
+          $zfs_pool_disks_joined || fail_warning
 
     # https://github.com/NixOS/nixpkgs/issues/16954
     zfs set acltype=posixacl "$zfs_pool_name"
@@ -344,7 +345,7 @@ uefi_mkfs() {
             translated_chars+=("$tchars")
         done
     }
-    [[ ! $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && id_translate
+    [[ ! $(echo ${zfs_pool_disks[1]} | grep "/dev/sd") ]] && id_translate
 
     # get disk letter for each disk for the mdadm command.
     if [[ $translated_chars ]]
@@ -492,27 +493,36 @@ $maybe_append_host_id
 }
 EOF
 
-    if [[ $uefi_install ]]
-    then
-        maybe_grub_efiSupport="boot.loader.grub.efiSupport = true;"
-    else
-        maybe_grub_zfsSupport="boot.supportedFilesystems = [ \"zfs\" ];"
-    fi
+    [[ $uefi_install ]] && maybe_grub_zfsSupport="boot.supportedFilesystems = [ \"zfs\" ];"
+
     [[ $nix_zfs_configuration_enabled == "true" ]] && cat << EOF > /mnt/etc/nixos/zfs-configuration.nix
 { ... }:
 { imports = [];
 
 # Configure grub with efi or zfs support if needed
-$maybe_grub_efiSupport
 $maybe_grub_zfsSupport
-boot.loader.grub.enable = true;
-boot.loader.grub.version = 2;
-boot.loader.grub.devices = [
-$(for disk_id in "${zfs_pool_disks[@]}"
-do
-echo "\"$disk_id\""
-done)
-];
+
+# tmp
+boot.loader = {
+  efi = {
+    canTouchEfiVariables = true;
+    efiSysMountPoint = "/efi"; # use the same mount point here.
+  };
+  grub = {
+     efiSupport = true;
+     #efiInstallAsRemovable = true; # in case canTouchEfiVariables doesn't work for your system
+     device = "nodev";
+  };
+};
+
+# boot.loader.grub.enable = true;
+# boot.loader.grub.version = 2;
+# boot.loader.grub.devices = [
+# $(for disk_id in "${zfs_pool_disks[@]}"
+# do
+# echo "\"$disk_id\""
+# done)
+# ];
 
 # The 32-bit host id of the machine, formatted as 8 hexadecimal characters.
 # You should try to make this id unique among your machines.
