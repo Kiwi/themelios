@@ -340,6 +340,7 @@ uefi_mkfs() {
         mkfs.vfat -F32 "$disk_id""$efi_part"
     done
 
+    # translate /dev/disk/by-id to /dev/sd* for mdadm if necessary
     id_translate() {
         for disk_id in "${zfs_pool_disks[@]}"; do
             tchars=$(readlink $disk_id)
@@ -348,15 +349,14 @@ uefi_mkfs() {
     }
     [[ ! $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && id_translate
 
+    # get disk letter for each disk for the mdadm command.
     if [[ $translated_chars ]]
     then
         dev_chars=$(join_by ',' "${translated_chars[@]#../../dev/sd##*/sd}}")
     else
-        # get disk letter for each disk for the mdadm command.
         dev_chars=$(join_by ',' "${zfs_pool_disks[@]#/dev/sd}")
     fi
 
-    uefi_sda_or_id
     uefi_mkfs
     mkdir /mnt/boot/
     mkdir /mnt/efi
@@ -371,6 +371,7 @@ uefi_mkfs() {
         mkfs.ext4 "${zfs_pool_disks[1]}""$ext4_part"
         mount "${zfs_pool_disks[1]}""$ext4_part"
     fi
+
     # mount uefi partition on the first disk (uefi cannot be raided.)
     mount "${zfs_pool_disks[1]}""$efi_part" /mnt/efi
 }
@@ -659,8 +660,9 @@ else
     zpool_create
 fi
 
-# this is where grub stage1 will be installed later by nixos-install.
-create_bios_boot_partitions
+[[ $uefi_install ]] && uefi_mkfs
+
+[[ ! $uefi_install ]] && create_bios_boot_partitions
 
 # create default datasets or maybe-use optional user overlay instead.
 if [[ -f $zfs_dataset_overlay_file ]]
