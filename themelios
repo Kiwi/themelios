@@ -273,7 +273,7 @@ disk_prep() {
         for disk_id in "${zfs_pool_disks[@]}"
         do
             echo "wiping disk signatures with wipefs..."
-            wipefs --all "$disk_id" || fail_warning
+            wipefs -fa "$disk_id" || fail_warning
         done
     }
     [[ $use_wipefs_all == "true" ]] && wipefs_all
@@ -296,9 +296,7 @@ zpool_create() {
     # join each array item together into one variable, separated by spaces.
     join_by() { local IFS="$1"; shift; echo "$*"; }
     zfs_pool_disks_joined=( "${zfs_pool_disks[@]/%/$zpool_partition}" )
-    echo array ${zfs_pool_disks_joined[@]}
     zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks_joined[@]}")
-    echo string $zfs_pool_disks_joined
 
     echo "creating zpool..."
     zpool create -f \
