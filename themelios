@@ -150,7 +150,7 @@ uefi_or_legacy() {
     [[ -d "/sys/firmware/efi/efivars" ]] && uefi_install="1"
 
     # some initial translation for whether or not the script was provided disks with sd* or /dev/disk/by-id/*
-    [[ $(${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="1"
+    [[ $(echo ${zfs_pool_disks[1]} | grep "/dev/sd") ]] && use_uefi_sdX="1"
     if [[ $use_uefi_sdX ]]
     then
         efi_part="2"
@@ -295,7 +295,10 @@ zpool_create() {
 
     # join each array item together into one variable, separated by spaces.
     join_by() { local IFS="$1"; shift; echo "$*"; }
-    zfs_pool_disks_joined=$(join_by "$zpool_partition " "${zfs_pool_disks[@]}")
+    zfs_pool_disks_joined=( "${zfs_pool_disks[@]/%/$zpool_partition}" )
+    echo array ${zfs_pool_disks_joined[@]}
+    zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks_joined[@]}")
+    echo string $zfs_pool_disks_joined
 
     echo "creating zpool..."
     zpool create -f \
@@ -309,7 +312,7 @@ zpool_create() {
           -R /mnt \
           $zfs_pool_name \
           $zfs_pool_type \
-          $zfs_pool_disks_joined$zpool_partition || fail_warning
+          $zfs_pool_disks_joined || fail_warning
 
     # https://github.com/NixOS/nixpkgs/issues/16954
     zfs set acltype=posixacl "$zfs_pool_name"
@@ -502,6 +505,9 @@ EOF
 $maybe_grub_zfsSupport
 
 # tmp
+$(if [[ $uefi_install ]]
+then
+cat <<- UEFI
 boot.loader = {
   efi = {
     canTouchEfiVariables = true;
@@ -514,14 +520,21 @@ boot.loader = {
   };
 };
 
-# boot.loader.grub.enable = true;
-# boot.loader.grub.version = 2;
-# boot.loader.grub.devices = [
-# $(for disk_id in "${zfs_pool_disks[@]}"
-# do
-# echo "\"$disk_id\""
-# done)
-# ];
+UEFI
+else
+cat <<- LEGACY
+
+boot.loader.grub.enable = true;
+boot.loader.grub.version = 2;
+boot.loader.grub.devices = [
+$(for disk_id in "${zfs_pool_disks[@]}"
+do
+echo "\"$disk_id\""
+done)
+];
+
+LEGACY
+fi)
 
 # The 32-bit host id of the machine, formatted as 8 hexadecimal characters.
 # You should try to make this id unique among your machines.
@@ -651,9 +664,6 @@ git_branch=$3
 # warn user of potential doom.
 initial_warning
 
-# check for legacy or uefi bios.
-uefi_or_legacy
-
 # install zfs if needed to the livedisk.
 which zfs > /dev/null 2>&1 || bootstrap_zfs
 
@@ -665,6 +675,9 @@ which git > /dev/null 2>&1 || bootstrap_git
 
 # clone the repo and get all of the configuration information.
 get_custom_nixcfg
+
+# check for legacy or uefi bios.
+uefi_or_legacy
 
 # use sgdisk wipefs and dd tools to cleanup old disks.
 disk_prep
