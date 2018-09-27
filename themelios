@@ -154,12 +154,10 @@ uefi_or_legacy() {
     if [[ $use_uefi_sdX ]]
     then
         efi_part="2"
-        ext4_part="3"
-        zpool_partition="4"
+        zpool_partition="3"
     else
         efi_part="-part2"
-        ext4_part="-part3"
-        zpool_partition="-part4"
+        zpool_partition="-part3"
     fi
 }
 
@@ -317,63 +315,29 @@ zpool_create() {
 }
 
 uefi_disk_part() {
-    # make 1mb bios boot, 200mb efi, 1GB ext4 and remaining partition for the zpool
+    # make 1mb bios boot, 1G efi/boot, remaining partition for the zpool
     for disk_id in "${zfs_pool_disks[@]}"
     do
         sgdisk -og "$disk_id"
         sgdisk -n 1:2048:4095 -c 1:"BIOS Boot Partition" -t 1:ef02 "$disk_id"
-        sgdisk -n 2:4096:413695 -c 2:"EFI System Partition" -t 2:ef00 "$disk_id"
-        sgdisk -n 3:413696:4116475 -c 3:"Linux /boot" -t 3:8300 "$disk_id"
+        sgdisk -n 2:4096:+1G -c 2:"EFI System Partition" -t 2:ef00 "$disk_id"
         ENDSECTOR=`sgdisk -E "$disk_id"`
-        sgdisk -n 4:4116476:$ENDSECTOR -c 4:"Linux ZPOOL Partition" -t 3:8300 "$disk_id"
+        sgdisk -n 3:2101248:$ENDSECTOR -c 3:"Linux ZPOOL Partition" -t 3:8300 "$disk_id"
         sgdisk -p "$disk_id"
         partx -u "$disk_id"
     done
 }
 
 uefi_mkfs() {
-    # make fat32 for /efi on all disks
+    # make fat32 for /boot on all disks
     for disk_id in "${zfs_pool_disks[@]}"
     do
         # https://wiki.archlinux.org/index.php/EFI_system_partition#Format_the_partition
         mkfs.vfat -F32 "$disk_id""$efi_part" || mkfs.fat -s2 -F32 "$disk_id""$efi_part"
     done
 
-    # translate /dev/disk/by-id to /dev/sd* for mdadm if necessary
-    id_translate() {
-        for disk_id in "${zfs_pool_disks[@]}"; do
-            tchars=$(readlink $disk_id)
-            translated_chars+=("$tchars")
-        done
-    }
-    [[ ! $(echo ${zfs_pool_disks[1]} | grep "/dev/sd") ]] && id_translate
-
-    # get disk letter for each disk for the mdadm command.
-    if [[ $translated_chars ]]
-    then
-        dev_chars=$(join_by ',' "${translated_chars[@]#../../dev/sd##*/sd}}")
-    else
-        dev_chars=$(join_by ',' "${zfs_pool_disks[@]#/dev/sd}")
-    fi
-
-    # make mountpoints
-    mkdir -p /mnt/{efi,boot}
-
-    # mount /mnt/boot
-    if [[  ${#zfs_pool_disks[@]} -gt 1 ]]
-    then
-        # mount ext4 mdadm if more than one disk
-        mdadm --create /dev/md127 --metadata=0.90 --level=1 --raid-devices=${#zfs_pool_disks[@]} /dev/sd["$dev_chars"]$ext4_part
-        mkfs.ext4 -m 0 -L boot -j /dev/md127
-        mount /dev/md127 /mnt/boot
-    else
-        # if it's a single disk don't use mdadm
-        mkfs.ext4 "${zfs_pool_disks[1]}""$ext4_part"
-        mount "${zfs_pool_disks[1]}""$ext4_part" /mnt/boot
-    fi
-
-    # mount uefi partition only on the first disk (efi partitions cannot be raided.)
-    mount "${zfs_pool_disks[1]}""$efi_part" /mnt/efi
+    mkdir /mnt/boot
+    mount "${zfs_pool_disks[1]}""$efi_part" /mnt/boot
 }
 
 create_bios_boot_partitions() {
@@ -393,8 +357,7 @@ datasets_create() {
     mount -t zfs "$zfs_pool_name"/ROOT/nixos /mnt
     zpool set bootfs="$zfs_pool_name"/ROOT/nixos "$zfs_pool_name"
 
-    # for UEFI systems - create and mount /boot as ext4 (and uses mdadm if multi-disks)
-    # this also mounts the EFI partition to /efi with a fat32 fs.
+    # for UEFI systems - create/mount the EFI partition to /boot with a fat32 fs.
     [[ $uefi_install ]] && uefi_mkfs
 
     slash_nix_outside_root() {
@@ -510,7 +473,7 @@ cat <<- UEFI
 boot.loader = {
   efi = {
     canTouchEfiVariables = true;
-    efiSysMountPoint = "/efi"; # use the same mount point here.
+    efiSysMountPoint = "/boot"; # use the same mount point here.
   };
   grub = {
      efiSupport = true;
