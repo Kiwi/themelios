@@ -457,16 +457,10 @@ $maybe_append_host_id
 }
 EOF
 
-    [[ $uefi_install ]] && maybe_grub_zfsSupport="boot.supportedFilesystems = [ \"zfs\" ];"
-
     [[ $nix_zfs_configuration_enabled == "true" ]] && cat << EOF > /mnt/etc/nixos/zfs-configuration.nix
 { ... }:
 { imports = [];
 
-# Configure grub with efi or zfs support if needed
-$maybe_grub_zfsSupport
-
-# tmp
 $(if [[ $uefi_install ]]
 then
 cat <<- UEFI
@@ -486,6 +480,7 @@ UEFI
 else
 cat <<- LEGACY
 
+boot.supportedFilesystems = [ "zfs" ];
 boot.loader.grub.enable = true;
 boot.loader.grub.version = 2;
 boot.loader.grub.devices = [
