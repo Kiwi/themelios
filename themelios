@@ -295,9 +295,8 @@ zpool_create() {
 
     # join each array item together into one variable, separated by spaces.
     join_by() { local IFS="$1"; shift; echo "$*"; }
-    zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks[@]}")
+    zfs_pool_disks_joined=$(join_by "$zpool_partition " "${zfs_pool_disks[@]}")
 
-    #TODO add zpool partition number
     echo "creating zpool..."
     zpool create -f \
           -o ashift=12 \
@@ -310,7 +309,7 @@ zpool_create() {
           -R /mnt \
           $zfs_pool_name \
           $zfs_pool_type \
-          $zfs_pool_disks_joined || fail_warning
+          $zfs_pool_disks_joined$zpool_partition || fail_warning
 
     # https://github.com/NixOS/nixpkgs/issues/16954
     zfs set acltype=posixacl "$zfs_pool_name"
