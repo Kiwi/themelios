@@ -586,6 +586,7 @@ EOF
         [[ $zfs_make_swap == "true" ]] && swapoff /dev/zvol/"$zfs_pool_name"/swap/swap0
 
         echo "unmounting /mnt"
+        [[ $uefi_install ]] && umount /mnt/boot
         umount /mnt/home
         umount /mnt/tmp
         umount /mnt
