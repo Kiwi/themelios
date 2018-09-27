@@ -329,6 +329,7 @@ uefi_disk_part() {
         ENDSECTOR=`sgdisk -E "$disk_id"`
         sgdisk -n 4:4116476:$ENDSECTOR -c 4:"Linux ZPOOL Partition" -t 3:8300 "$disk_id"
         sgdisk -p "$disk_id"
+        partx -u "$disk_id"
     done
 }
 
