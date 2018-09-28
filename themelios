@@ -460,27 +460,24 @@ EOF
     [[ $nix_zfs_configuration_enabled == "true" ]] && cat << EOF > /mnt/etc/nixos/zfs-configuration.nix
 { ... }:
 { imports = [];
+boot.supportedFilesystems = [ "zfs" ];
 
 $(if [[ $uefi_install ]]
 then
 cat <<- UEFI
+
 boot.loader = {
-  efi = {
-    canTouchEfiVariables = true;
-    efiSysMountPoint = "/boot"; # use the same mount point here.
-  };
-  grub = {
-     efiSupport = true;
-     #efiInstallAsRemovable = true; # in case canTouchEfiVariables doesn't work for your system
-     device = "nodev";
-  };
+efi = {
+canTouchEfiVariables = true;
+efiSysMountPoint = "/boot"; # use the same mount point here.
+};
+systemd-boot.enable = true; # (for UEFI systems only)
 };
 
 UEFI
 else
 cat <<- LEGACY
 
-boot.supportedFilesystems = [ "zfs" ];
 boot.loader.grub.enable = true;
 boot.loader.grub.version = 2;
 boot.loader.grub.devices = [
