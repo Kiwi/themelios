@@ -254,10 +254,23 @@ get_custom_nixcfg() {
 
     source "$config_dot_sh" || die "$config_dot_sh file not found."
 
+    #############
+    # parse the newly received $config_dot_sh variables
+    #############
+
     # prepare optional overlay locations based on where the users configuration.sh is.
     zfs_pool_overlay_file=${config_dot_sh%/*}/$zfs_pool_overlay_file
     zfs_dataset_overlay_file=${config_dot_sh%/*}/$zfs_dataset_overlay_file
     postinstall_overlay_file=${config_dot_sh%/*}/$postinstall_overlay_file
+
+    # convert option from nix true/false style to proper zfs on/off option format.
+    if [[ $zfs_use_atime == "true" ]] ; then zfs_use_atime="on" ; else zfs_use_atime="off" ; fi
+
+    # join the disk array items together into one variable, separated by spaces. (used by zpool_create())
+    # but first append the partition number, if there is one to append (in the case of uefi)
+    zfs_pool_disks_joined=( "${zfs_pool_disks[@]/%/$zpool_partition}" )
+    join_by() { local IFS="$1"; shift; echo "$*"; }
+    zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks_joined[@]}")
 }
 
 disk_prep() {
@@ -291,15 +304,6 @@ disk_prep() {
 }
 
 zpool_create() {
-    # convert option from nix true/false style to proper zfs on/off.
-    if [[ $zfs_use_atime == "true" ]] ; then zfs_use_atime="on" ; else zfs_use_atime="off" ; fi
-
-    # join each array item together into one variable, separated by spaces.
-    join_by() { local IFS="$1"; shift; echo "$*"; }
-    # append disk partition to disks if there is one (in the case of uefi)
-    zfs_pool_disks_joined=( "${zfs_pool_disks[@]/%/$zpool_partition}" )
-    zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks_joined[@]}")
-
     echo "creating zpool..."
     zpool create -f \
           -o ashift=12 \
@@ -463,7 +467,6 @@ EOF
 { ... }:
 { imports = [];
 boot.supportedFilesystems = [ "zfs" ];
-
 $(if [[ $uefi_install ]]
 then
 cat <<- UEFI
