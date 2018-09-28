@@ -149,16 +149,19 @@ uefi_or_legacy() {
     # detect if this is a uefi installation.
     [[ -d "/sys/firmware/efi/efivars" ]] && uefi_install="1"
 
-    # some initial translation for whether or not the script was provided disks with sd* or /dev/disk/by-id/*
-    [[ $(echo ${zfs_pool_disks[0]} | grep "/dev/sd") ]] && use_uefi_sdX="1"
-    if [[ $use_uefi_sdX ]]
-    then
-        efi_part="2"
-        zpool_partition="3"
-    else
-        efi_part="-part2"
-        zpool_partition="-part3"
-    fi
+    uefi_translate() {
+        # some initial translation for whether or not the script was provided disks with sd* or /dev/disk/by-id/*
+        [[ $(echo ${zfs_pool_disks[0]} | grep "/dev/sd") ]] && use_uefi_sdX="1"
+        if [[ $use_uefi_sdX ]]
+        then
+            efi_part="2"
+            zpool_partition="3"
+        else
+            efi_part="-part2"
+            zpool_partition="-part3"
+        fi
+    }
+    [[ $uefi_install ]] && uefi_translate
 }
 
 switch_if_needed() {
