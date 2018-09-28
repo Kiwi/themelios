@@ -293,6 +293,7 @@ zpool_create() {
 
     # join each array item together into one variable, separated by spaces.
     join_by() { local IFS="$1"; shift; echo "$*"; }
+    # append disk partition to disks if there is one (in the case of uefi)
     zfs_pool_disks_joined=( "${zfs_pool_disks[@]/%/$zpool_partition}" )
     zfs_pool_disks_joined=$(join_by ' ' "${zfs_pool_disks_joined[@]}")
 
@@ -319,11 +320,10 @@ uefi_disk_part() {
     for disk_id in "${zfs_pool_disks[@]}"
     do
         sgdisk -og "$disk_id"
-        sgdisk -n 1:2048:4095 -c 1:"BIOS Boot Partition" -t 1:ef02 "$disk_id"
-        sgdisk -n 2:4096:+1G -c 2:"EFI System Partition" -t 2:ef00 "$disk_id"
-        ENDSECTOR=`sgdisk -E "$disk_id"`
-        sgdisk -n 3:2101248:$ENDSECTOR -c 3:"Linux ZPOOL Partition" -t 3:8300 "$disk_id"
-        sgdisk -p "$disk_id"
+        sgdisk -n 1:2048:4095 -c 1:"BIOS Boot Partition" -t 1:ef02 "$disk_id" || fail_warning
+        sgdisk -n 2:4096:2101247 -c 2:"EFI System Partition" -t 2:ef00 "$disk_id" || fail_warning
+        sgdisk -n 3:2101248:"$(sgdisk -E "$disk_id")" -c 3:"Linux ZPOOL Partition" -t 3:8300 "$disk_id" || fail_warning
+        sgdisk -p "$disk_id" || fail_warning
         partx -u "$disk_id"
     done
 }
@@ -332,8 +332,7 @@ uefi_mkfs() {
     # make fat32 for /boot on all disks
     for disk_id in "${zfs_pool_disks[@]}"
     do
-        # https://wiki.archlinux.org/index.php/EFI_system_partition#Format_the_partition
-        mkfs.vfat -F32 "$disk_id""$efi_part" || mkfs.fat -s2 -F32 "$disk_id""$efi_part"
+        mkfs.vfat -F32 "$disk_id""$efi_part" || fail_warning
     done
 
     mkdir /mnt/boot
