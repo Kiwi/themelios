@@ -327,8 +327,11 @@ uefi_disk_part() {
     for disk_id in "${zfs_pool_disks[@]}"
     do
         sgdisk -og "$disk_id"
+        echo "making bios boot partition..."
         sgdisk -n 1:2048:4095 -c 1:"BIOS Boot Partition" -t 1:ef02 "$disk_id" || fail_warning
+        echo "make efi system partition..."
         sgdisk -n 2:4096:2101247 -c 2:"EFI System Partition" -t 2:ef00 "$disk_id" || fail_warning
+        echo "making zpool partition..."
         sgdisk -n 3:2101248:"$(sgdisk -E "$disk_id")" -c 3:"Linux ZPOOL Partition" -t 3:8300 "$disk_id" || fail_warning
         sgdisk -p "$disk_id" || fail_warning
         partx -u "$disk_id"
