@@ -13,7 +13,7 @@ zfs_pool_type="mirror"           # use "" for single, or "mirror", "raidz1", etc
 
 # Note: using /dev/disk/by-id is also preferable.
 #zfs_pool_disks=("/dev/sda" "/dev/sdb")
-fs_pool_disks=("/dev/disk/by-id/ata-QEMU_HARDDISK_QM00003" "/dev/disk/by-id/ata-QEMU_HARDDISK_QM00005")
+zfs_pool_disks=("/dev/disk/by-id/ata-QEMU_HARDDISK_QM00003" "/dev/disk/by-id/ata-QEMU_HARDDISK_QM00005")
 
 # Datasets to be set with com.sun:auto-snapshot=true.
 zfs_auto_snapshot=("$zfs_pool_name/HOME" "$zfs_pool_name/ROOT")
@@ -50,24 +50,24 @@ nix_install_opts="--max-jobs 4 --cores 0 --no-root-passwd"
 # Creates /etc/nixos/zfs-configuration.nix with sensible settings.
 nix_zfs_configuration_enabled="true"
 
- # Enable "extra" options [below] in addition to zfs_configuration?
- nix_zfs_configuration_extra_enabled="true"
+# Enable "extra" options [below] in addition to zfs_configuration?
+nix_zfs_configuration_extra_enabled="true"
 
- # Enables periodic scrubbing of ZFS pools.
- nix_zfs_extra_auto_scrub="true"
+# Enables periodic scrubbing of ZFS pools.
+nix_zfs_extra_auto_scrub="true"
 
- # Enable the (OpenSolaris-compatible) ZFS auto-snapshotting service.
- nix_zfs_extra_auto_snapshot_enabled="true"
- nix_zfs_extra_auto_snapshot_frequent="8"   # take a snapshot every 15 minutes and keep 8 in rotation
- nix_zfs_extra_auto_snapshot_hourly="0"
- nix_zfs_extra_auto_snapshot_daily="7"      # take a daily snapshot and keep 7 in rotation
- nix_zfs_extra_auto_snapshot_weekly="0"
- nix_zfs_extra_auto_snapshot_monthly="0"
+# Enable the (OpenSolaris-compatible) ZFS auto-snapshotting service.
+nix_zfs_extra_auto_snapshot_enabled="true"
+nix_zfs_extra_auto_snapshot_frequent="8"   # take a snapshot every 15 minutes and keep 8 in rotation
+nix_zfs_extra_auto_snapshot_hourly="0"
+nix_zfs_extra_auto_snapshot_daily="7"      # take a daily snapshot and keep 7 in rotation
+nix_zfs_extra_auto_snapshot_weekly="0"
+nix_zfs_extra_auto_snapshot_monthly="0"
 
- # Use NixOs automatic garbage collection?
- nix_zfs_extra_gc_automatic="true"
- nix_zfs_extra_gc_dates="weekly"
- nix_zfs_extra_gc_options="--delete-older-than 30d"
+# Use NixOs automatic garbage collection?
+nix_zfs_extra_gc_automatic="true"
+nix_zfs_extra_gc_dates="weekly"
+nix_zfs_extra_gc_options="--delete-older-than 30d"
 
- # Clean /tmp automatically on boot.
- nix_zfs_extra_clean_tmp_dir="true"
+# Clean /tmp automatically on boot.
+nix_zfs_extra_clean_tmp_dir="true"
