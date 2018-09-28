@@ -44,7 +44,7 @@ nix_top_level_configuration="hosts/vm-example"
 nix_repo_name="nix-config"
 
 # Optionally inserted as "nixos-install --root /mnt $nix_install_opts"
-nix_install_opts=""
+nix_install_opts="--max-jobs 4 --cores 0 --no-root-passwd"
 
 # Creates /etc/nixos/zfs-configuration.nix with sensible settings.
 nix_zfs_configuration_enabled="true"
