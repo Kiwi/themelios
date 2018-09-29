@@ -296,8 +296,6 @@ zpool_create() {
     # convert option from nix true/false style to proper zfs on/off option format.
     if [[ $zfs_use_atime == "true" ]] ; then zfs_use_atime="on" ; else zfs_use_atime="off" ; fi
 
-    sleep 10
-
     echo "creating zpool..."
     zpool create -f \
           -o ashift=12 \
@@ -334,14 +332,28 @@ uefi_disk_part() {
         sgdisk -n 3:2101248:"$(sgdisk -E "$disk_id")" -c 3:"Linux ZPOOL Partition" -t 3:8300 "$disk_id" || fail_warning
         sgdisk -p "$disk_id" || fail_warning
         partx -u "$disk_id"
+
+        # HELP-WANTED I have encountered strange bugs here while developing, possibly only vm-related.
+        # basically, even though i have partx -u already, sometimes linux still isn't able to resolve
+        # the /dev/path/to/disk in the pool create command or with the mkfs.vfat command.
+        # after waiting a bit, or restarting the host machine / vm, running the same command works.
+        # sleep for good measure, just in case.
+        sleep 10
     done
 }
 
 uefi_mkfs() {
+    # HELP-WANTED I have encountered strange bugs here while developing, possibly only vm-related.
+    # basically, even though i have partx -u already, sometimes linux still isn't able to resolve
+    # the /dev/path/to/disk in the pool create command or with the mkfs.vfat command.
+    # after waiting a bit, or restarting the host machine / vm, running the same command works.
+    # sleep for good measure, just in case.
+    sleep 10
+
     # make fat32 for /boot on all disks
     for disk_id in "${zfs_pool_disks[@]}"
     do
-        mkfs.vfat -F32 "$disk_id""$efi_part" || fail_warning
+         mkfs.vfat -F32 "$disk_id""$efi_part" || fail_warning
     done
 
     mkdir /mnt/boot
