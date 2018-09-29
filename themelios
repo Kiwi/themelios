@@ -332,14 +332,14 @@ uefi_disk_part() {
         sgdisk -n 3:2101248:"$(sgdisk -E "$disk_id")" -c 3:"Linux ZPOOL Partition" -t 3:8300 "$disk_id" || fail_warning
         sgdisk -p "$disk_id" || fail_warning
         partx -u "$disk_id"
-
-        # HELP-WANTED I have encountered strange bugs here while developing, possibly only vm-related.
-        # basically, even though i have partx -u already, sometimes linux still isn't able to resolve
-        # the /dev/path/to/disk in the pool create command or with the mkfs.vfat command.
-        # after waiting a bit, or restarting the host machine / vm, running the same command works.
-        # sleep for good measure, just in case.
-        sleep 10
     done
+    # HELP-WANTED I have encountered strange bugs here while developing, possibly only vm-related.
+    # basically, even though i have partx -u already, sometimes linux still isn't able to resolve
+    # the /dev/path/to/disk in the pool create command or with the mkfs.vfat command.
+    # after waiting a bit, or restarting the host machine / vm, running the same command works.
+    # sleep for good measure, just in case.
+    # related: https://github.com/zfsonlinux/zfs/issues/3708
+    sleep 10
 }
 
 uefi_mkfs() {
@@ -348,6 +348,7 @@ uefi_mkfs() {
     # the /dev/path/to/disk in the pool create command or with the mkfs.vfat command.
     # after waiting a bit, or restarting the host machine / vm, running the same command works.
     # sleep for good measure, just in case.
+    # related: https://github.com/zfsonlinux/zfs/issues/3708
     sleep 10
 
     # make fat32 for /boot on all disks
