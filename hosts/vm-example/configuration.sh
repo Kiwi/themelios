@@ -12,7 +12,7 @@ zfs_pool_name="zroot"
 zfs_pool_type=""           # use "" for single, or "mirror", "raidz1", etc.
 
 # Note: using /dev/disk/by-id is also preferable.
-zfs_pool_disks=("/dev/sda")
+zfs_pool_disks=("/dev/disk/by-id/ata-QEMU_HARDDISK_QM00003")
 #zfs_pool_disks=("/dev/sda")
 
 # # Datasets to be set with com.sun:auto-snapshot=true.
