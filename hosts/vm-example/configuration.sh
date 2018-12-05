@@ -28,7 +28,7 @@ zfs_make_swap="true"            # creates a swap zvol (Not recommended in zfs-la
 zfs_swap_size="16G"
 
 # If set, themelios will source them if the files exist alongside configuration.sh
-zfs_pool_overlay_file=""         # override zpool_create()
+zfs_pool_overlay_file="overlay-pool"         # override zpool_create()
 zfs_dataset_overlay_file=""      # override datasets_create()
 postinstall_overlay_file=""      # run arbritrary code after nixos-install and before umount /mnt.
 
