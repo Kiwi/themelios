@@ -8,11 +8,11 @@ use_zero_disks="false"     # use dd if=/dev/zero ...
 
 # ZFS POOL SETTINGS #
 
-zfs_pool_name="zroot"
+zfs_pool_name="mvp-zroot"
 zfs_pool_type=""           # use "" for single, or "mirror", "raidz1", etc.
 
 # Note: using /dev/disk/by-id is also preferable.
-zfs_pool_disks=("/dev/sda")
+zfs_pool_disks=("/dev/disk/by-id/ata_APPLE_SSD_SM0512G_S2ZENY0J500021")
 
 # Datasets to be set with com.sun:auto-snapshot=true.
 zfs_auto_snapshot=("$zfs_pool_name/HOME" "$zfs_pool_name/ROOT")
@@ -24,8 +24,8 @@ zfs_dataset_slashnix_no_root="true"
 # Use atime?
 zfs_use_atime="false"            # (recommended "false" for ssd.)
 
-zfs_make_swap="false"            # creates a swap zvol (Not recommended in zfs-land.)
-zfs_swap_size="4G"
+zfs_make_swap="true"            # creates a swap zvol (Not recommended in zfs-land.)
+zfs_swap_size="16G"
 
 # If set, themelios will source them if the files exist alongside configuration.sh
 zfs_pool_overlay_file=""         # override zpool_create()
@@ -58,10 +58,10 @@ nix_zfs_extra_auto_scrub="true"
 # Enable the (OpenSolaris-compatible) ZFS auto-snapshotting service.
 nix_zfs_extra_auto_snapshot_enabled="true"
 nix_zfs_extra_auto_snapshot_frequent="8"   # take a snapshot every 15 minutes and keep 8 in rotation
-nix_zfs_extra_auto_snapshot_hourly="0"
+nix_zfs_extra_auto_snapshot_hourly="24"
 nix_zfs_extra_auto_snapshot_daily="7"      # take a daily snapshot and keep 7 in rotation
-nix_zfs_extra_auto_snapshot_weekly="0"
-nix_zfs_extra_auto_snapshot_monthly="0"
+nix_zfs_extra_auto_snapshot_weekly="4"
+nix_zfs_extra_auto_snapshot_monthly="12"
 
 # Use NixOs automatic garbage collection?
 nix_zfs_extra_gc_automatic="true"
