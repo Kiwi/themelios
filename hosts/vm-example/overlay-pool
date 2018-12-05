@@ -10,6 +10,8 @@ zpool_create() {
           -O xattr=sa \
           -m none \
           -R /mnt \
+          -O encryption=aes-256-gcm \
+          -O keyformat=passphrase \
           $zfs_pool_name \
           $zfs_pool_type \
           ${zfs_pool_disks[@]/%/$zpool_partition} || fail_warning
