@@ -12,7 +12,7 @@ zfs_pool_name="mvp-zroot"
 zfs_pool_type=""           # use "" for single, or "mirror", "raidz1", etc.
 
 # Note: using /dev/disk/by-id is also preferable.
-zfs_pool_disks=("/dev/disk/by-id/ata_APPLE_SSD_SM0512G_S2ZENY0J500021")
+zfs_pool_disks=("/dev/disk/by-id/ata-APPLE_SSD_SM0512G_S2ZENY0J500021")
 
 # Datasets to be set with com.sun:auto-snapshot=true.
 zfs_auto_snapshot=("$zfs_pool_name/HOME" "$zfs_pool_name/ROOT")
